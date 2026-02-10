@@ -8,7 +8,7 @@
 #include "png_steg.h"
 #include "png_overlay.h"
 
-
+#include <getopt.h>
 #include <unistd.h>
 
 int main(int argc, char **argv)
@@ -40,24 +40,11 @@ int main(int argc, char **argv)
     }
     // second phase
     // if have time, consider making this a single 
-    struct Flags {
-        char summary;
-        char palette;
-        char ihdr;
-        char encode_msg;
-        char decode_msg;
-        struct overlay{
-            int width;
-            int height;
-        };
-        char * outfile;
-        char * file2;
-    } flags;
-    
-    while(opt = getopt(argc, argv, "spie:o:dm:")){
+    while((opt = getopt(argc, argv, "spie:dm:"))){
         switch(opt){
             case 's': // summary
-                
+                png_chunk_t* out_summary = NULL;
+                int code = png_summary(filename, &out_summary);
                 
                 break;
             case 'p': // palette summary
@@ -65,10 +52,11 @@ int main(int argc, char **argv)
                 if(!png_fp){
                     return EXIT_FAILURE;
                 }
-                png_extract_plte(png_fp, );
+                int code = pal
+              //  png_extract_plte(png_fp, );
                 break;
             case 'i': // IHDR
-                png_extract_ihdr();
+              //  png_extract_ihdr();
                 break;
             case 'm': // REQUIRES OPTARG file2; overlay file2 over input
                 char * small_path = optarg;
@@ -77,10 +65,14 @@ int main(int argc, char **argv)
                     return EXIT_FAILURE;
                 }
                 char * output_path = optarg;
+
+
+
                 // read width and height
                 // might have to add error fixing in the case of duplicate arguments
                 uint32_t x_offset = 0, y_offset = 0;
-                while(opt2 = getopt(argc, argv, ":w:h:") != -1 && opt2 != '?'){
+                int opt2;
+                while((opt2 = getopt(argc, argv, ":w:h:")) != -1 && opt2 != '?'){
                     if(opt2 == 'w'){
                         x_offset = (uint32_t)strtoul(optarg, NULL, 10);
                     } else if (opt2 == 'h'){
@@ -113,17 +105,11 @@ int main(int argc, char **argv)
                 switch(optopt){
                     case 'e':
                         PRINT_ERROR_ENCODE_REQUIRES();
-                    case 'o':
-                        if(flags.encode_msg){
-                            PRINT_ERROR_ENCODE_REQUIRES();
-                        } else {
-                            PRINT_ERROR_OVERLAY_REQUIRES();
-                        }
-                        break;
                     case 'm':
                         PRINT_ERROR_OVERLAY_REQUIRES();
                     default: 
-                        PRINT_ERROR_UNKNOWN_OPTION(optopt);
+                        char opt_string[2] = {optopt, '\0'};
+                        PRINT_ERROR_UNKNOWN_OPTION( opt_string);
                         break;
                 } 
                 return EXIT_FAILURE;

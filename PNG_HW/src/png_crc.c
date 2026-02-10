@@ -4,9 +4,8 @@ uint32_t png_crc(const uint8_t *buf, size_t len)
 {
 
 //     The CRC-32 algorithm can be implemented as follows:
-
 //     Initialize a lookup table: Create a 256-entry table where each entry is computed by applying the CRC polynomial 0xEDB88320 to each possible byte value (0-255).
-// For each byte value n, iterate 8 times: if the least significant bit is set, XOR with the polynomial and shift right; otherwise just shift right.
+//  For each byte value n, iterate 8 times: if the least significant bit is set, XOR with the polynomial and shift right; otherwise just shift right.
 
 //     Initialize CRC register: Start with 0xFFFFFFFF (all bits set).
 
@@ -18,22 +17,22 @@ uint32_t png_crc(const uint8_t *buf, size_t len)
 
 // If this doesn't make sense to you, look closely at the provided PNG documentation where a more thorough discussion of how to implement CRC is provided.
 //     return 0xFFFFFFFFUL;
-    int lookup[256];
-    for(int n = 0; n < 255; n++){
-        int temp = n;
-        for(int i = 0; i< 8 ; i++){
+    uint32_t lookup[256];
+    for(int n = 0; n < 256; n++){
+        uint32_t temp = (uint32_t) n;
+        for(int i = 0; i < 8 ; i++){
             if(temp & 1){
-                temp ^= CRC_POLYNOMIAL;
-                
+                temp = (uint32_t)CRC_POLYNOMIAL ^ (temp >> 1);
+            } else {
+                temp = temp >> 1;
             }
-            temp >>= 1;
         }
         lookup[n] = temp;
     }
-    uint32_t crc = 0xFFFFFFFF;
+    uint32_t crc = 0xFFFFFFFFL;
     for(int i = 0; i < len; i++){
-        crc = lookup[(crc^buf[i]) & 0xff] ^ (crc >> 8);
+        crc = lookup[(crc^buf[i]) & 0xFF] ^ (crc >> 8);
     }
-    return crc ^ 0xFFFFFFFF;
+    return crc ^ 0xFFFFFFFFL;
 }
 

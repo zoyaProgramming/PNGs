@@ -48,6 +48,7 @@ static int compare_files(const char *file1, const char *file2) {
     return match ? 0 : -1;
 }
 
+// don't commit this!
 /* ========== ENCODE TESTS ========== */
 
 Test(steg_encode, encode_lsb_basic_type3) {

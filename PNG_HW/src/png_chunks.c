@@ -2,6 +2,7 @@
 #include "util.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /* Parse IHDR data from chunk */
 /* Chunk must be an IHDR chunk with length 13 */
@@ -13,13 +14,18 @@ int png_parse_ihdr(const png_chunk_t *chunk, png_ihdr_t *out)
     uint8_t * dataPtr  = chunk->data;
     *out = *(png_ihdr_t*)dataPtr;
 
-    out->width = read_u32_be(out->width);
-    out->height = read_u32_be(out->height);
+    out->width = read_u32_be((uint8_t*)&out->width);
+    out->height = read_u32_be((uint8_t *)&out->height);
+    printf("hit line 19 w :%d h: %d\n", out->width, out->height);
+    fflush(stdout);
 
     // check for invalid IHDR chunk values :
     if((out->bit_depth != 1 && out->bit_depth != 2 && out->bit_depth != 4 && out->bit_depth != 8 && out->bit_depth != 16)||
-    (out->color_type != 0 || out->color_type != 2 || out->color_type != 3 || out->color_type != 4|| out->color_type != 6)||
-    (out->compression != 0 || out->filter != 0 || out->interlace != 0 || out->interlace > 0)){
+    (out->color_type != 0 && out->color_type != 2 && out->color_type != 3 && out->color_type != 4&& out->color_type != 6)||
+    (out->compression != 0 || out->filter != 0 || out->interlace != 0 || out->interlace > 1)){
+        printf("color issue bit depth: %d color_type : %d comp: %d filter: %d interlace: %d\n", out->bit_depth, out->color_type, out->compression, out->filter, out->interlace);
+        fflush(stdout);
+
         return -1;
     }
     return 0;
@@ -30,18 +36,23 @@ int png_parse_ihdr(const png_chunk_t *chunk, png_ihdr_t *out)
 /* Chunk must be a PLTE chunk with length multiple of 3 */
 int png_parse_plte(const png_chunk_t *chunk, png_color_t **out_colors, size_t *out_count)
 {
+    printf("length: %d\n", chunk->length);
+        fflush(stdout);
     if(!chunk || !out_colors || !out_count || chunk->length % 3 || chunk->length /3 > 256){ // check for invalid inputs
         return -1;
     }
     // allocaate color array
     *out_colors = malloc(sizeof(png_color_t) * (chunk->length)/3);
-    if(!out_colors){
+    if(!*out_colors){
+        printf("No outcolors: %d\n", chunk->length);
+        fflush(stdout);
         return -1;
     }
     uint32_t len = chunk->length;
-    memcpy
-
-
-    
-    return 0;
+    printf("Len: %d\n", len);
+    fflush(stdout);
+    // copy to outcolors
+    // should be aligned correctly by default
+    memcpy(*out_colors, chunk->data, len);
+    return len;
 }

@@ -21,9 +21,7 @@ int write_IDAT(FILE * fp, uint8_t * buf, uint32_t size){
     //write the size to the IDAT chunk
     char be_buf[4] = {0};
     char * b = be_buf;
-
-    printf("cry:\n");    
-    fflush(stdout);
+    
     write_be_buf(&b, size);
     fwrite(b, 1, 4, fp);
 

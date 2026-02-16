@@ -50,7 +50,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 */
     // 1) open and validate:
     FILE * inputp = png_open(input_path);
-    if(!inputp){
+    if(!inputp || !input_path || !output_path || !secret){
         return -1;
     }
 
@@ -161,6 +161,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         }
         data_buffer = new_ptr;
         memcpy(data_buffer + total_size, chunk.data, chunk.length);
+
         total_size += chunk.length;
         png_free_chunk(&chunk);
         idat_end = ftell(inputp);
@@ -265,7 +266,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 
     rewind(inputp);
     if(ihdr.color_type == 3 && plte_offset_start != -1){
-        // copy the IDAT and pre: PLTE chunks
+        // copy the pre: PLTE chunks
         for(int i = 0; i < plte_offset_start; i++){
             fputc(fgetc(inputp), fp);
         };
@@ -286,6 +287,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
     
         
     write_IDAT(fp, data_buffer, total_size);
+    
     // for(int i = 0; i < total_size; i++){
     //     if(fputc(data_buffer[i], fp) == EOF){
     //         fflush(stdout);
@@ -311,6 +313,35 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 
 
 int unfilter_bytes(uint8_t * filtered, int color_type, size_t height, size_t width){
+
+// Type 1 (Sub): Predicts each byte using the byte to its left (in the same scanline).
+
+//     For the first bpp (bytes per pixel) bytes, there's no left neighbor, so they're stored as-is
+//     For subsequent bytes, the filter stores: filtered[i] = original[i] - original[i - bpp]
+//     To unfilter: original[i] = filtered[i] + original[i - bpp] (modulo 256)
+
+// Type 2 (Up): Predicts each byte using the byte directly above it (from the previous scanline).
+
+//     For the first scanline, there's no above neighbor, so values are stored as-is
+//     For subsequent scanlines: filtered[i] = original[i] - above[i]
+//     To unfilter: original[i] = filtered[i] + above[i] (modulo 256)
+
+// Type 3 (Average): Predicts each byte as the average of the left and above neighbors.
+
+//     Calculates: prediction = (left + above) / 2 (integer division)
+//     Stores: filtered[i] = original[i] - prediction
+//     To unfilter: original[i] = filtered[i] + prediction (modulo 256)
+//     Edge cases: first bpp bytes have no left neighbor (use 0), first scanline has no above neighbor (use 0)
+
+// Type 4 (Paeth): Uses a sophisticated predictor that chooses the best neighbor based on a gradient calculation.
+
+//     Considers three neighbors: left (a), above (b), and upper-left (c)
+//     The Paeth predictor algorithm:
+//         Calculate p = a + b - c (a linear prediction)
+//         Compute distances from p to each neighbor: pa = |p - a|, pb = |p - b|, pc = |p - c|
+//         Choose the neighbor closest to p (smallest distance)
+//     To unfilter: original[i] = filtered[i] + chosen_neighbor (modulo 256)
+//     This filter typically provides the best compression for most images
 //     int bpp = get_bpp(color_type);
 //     int * original = malloc(width * height * bpp);
 // //     Type 0 (None): No filtering applied. The pixel values are stored as-is. This is the simplest case - no unfiltering operation is needed. When you write out the output file after overlaying the images, you should use this type.
@@ -373,34 +404,6 @@ int unfilter_bytes(uint8_t * filtered, int color_type, size_t height, size_t wid
     return 0;
 }
 
-// Type 1 (Sub): Predicts each byte using the byte to its left (in the same scanline).
-
-//     For the first bpp (bytes per pixel) bytes, there's no left neighbor, so they're stored as-is
-//     For subsequent bytes, the filter stores: filtered[i] = original[i] - original[i - bpp]
-//     To unfilter: original[i] = filtered[i] + original[i - bpp] (modulo 256)
-
-// Type 2 (Up): Predicts each byte using the byte directly above it (from the previous scanline).
-
-//     For the first scanline, there's no above neighbor, so values are stored as-is
-//     For subsequent scanlines: filtered[i] = original[i] - above[i]
-//     To unfilter: original[i] = filtered[i] + above[i] (modulo 256)
-
-// Type 3 (Average): Predicts each byte as the average of the left and above neighbors.
-
-//     Calculates: prediction = (left + above) / 2 (integer division)
-//     Stores: filtered[i] = original[i] - prediction
-//     To unfilter: original[i] = filtered[i] + prediction (modulo 256)
-//     Edge cases: first bpp bytes have no left neighbor (use 0), first scanline has no above neighbor (use 0)
-
-// Type 4 (Paeth): Uses a sophisticated predictor that chooses the best neighbor based on a gradient calculation.
-
-//     Considers three neighbors: left (a), above (b), and upper-left (c)
-//     The Paeth predictor algorithm:
-//         Calculate p = a + b - c (a linear prediction)
-//         Compute distances from p to each neighbor: pa = |p - a|, pb = |p - b|, pc = |p - c|
-//         Choose the neighbor closest to p (smallest distance)
-//     To unfilter: original[i] = filtered[i] + chosen_neighbor (modulo 256)
-//     This filter typically provides the best compression for most images
 
 /* Extract secret string from LSBs of image data */
 int png_extract_lsb(const char *input_path, char *out, size_t max_len)
@@ -408,13 +411,15 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     // 1) open and validate:
     FILE * inputp = png_open(input_path);
     if(!inputp || max_len == 0 || out == NULL){
+        fclose(inputp);
         return -1;
     }
     // 2) read & parse IHDR chunk to determine properties 
     png_ihdr_t ihdr;
     png_extract_ihdr(inputp, &ihdr);
     if(ihdr.bit_depth != 8){
-        return NULL;
+        fclose(inputp);
+        return -1;
     }
 
     int num_channels = 0;
@@ -430,7 +435,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
             return -1;
     }
 
-
     //3) for palette images : build a table of identical color pairs 
     png_color_t * out_colors = NULL;
     size_t out_count;
@@ -441,8 +445,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     Hashset unique_colors; 
     int num_pairs = 0; 
     long ihdr_end = ftell(inputp);
-    long plte_offset_start = -1;
-    long plte_offset_end = -1;
     if(ihdr.color_type == 3){
         png_extract_plte(inputp, &out_colors, &out_count);
         for(int i = 0; i < out_count; i++){
@@ -460,8 +462,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
             }
         }
     };
-
-
     // 4) decompress IDAT chunks
     png_chunk_t chunk;
     int error_code = 0;
@@ -474,8 +474,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
             idat_start = ftell(inputp) - (12 + chunk.length);
             break;
         } else if(strncmp(chunk.type, "PLTE", 4) == 0){
-            plte_offset_end = ftell(inputp);
-            plte_offset_start = plte_offset_end - (12 + chunk.length);
             png_free_chunk(&chunk);
         } else {
             png_free_chunk(&chunk);
@@ -485,7 +483,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
         fclose(inputp); png_free_chunk(&chunk); 
         return -1;
     }
-
     // load all IDAT chunks into buffer
     size_t total_size = 0L;
     uint8_t* data_buffer = NULL;
@@ -523,16 +520,13 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     }
     
     // 5) Calculate encoding capacity: width × height pixels
-    uint32_t encoding_capacity = ihdr.width * ihdr.height;
-
-
    //7)Decody the message:
     //For palette images: swap between identical-color pair indices (lower index = 0, higher = 1)
     int bytes_per_pixel = (num_channels * ihdr.bit_depth)/8;
     int bytes_per_row = 1 + bytes_per_pixel * ihdr.width;
     int bytes_written = 0;
     int bits_written = 0;
-    char * secret[max_len];
+    char secret[max_len];
     if(ihdr.color_type == 3){
         int byte = 0;
         for(int scanline = 0; (scanline < ihdr.height*bytes_per_row) && (bytes_written < max_len); scanline+= bytes_per_row){
@@ -564,7 +558,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
                 if((inflated_buffer[scanline + pixel]) & 0xFE){ // find the higher index
                     byte |= 1;
                 }
-                
                 // check if need to start writing to the next byte of secret
                 if((bits_written%8 == 7) && (byte != 0)){
                     secret[bytes_written] = byte;
@@ -573,50 +566,25 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
                     bits_written = 0;
                 }  else if(bits_written%8 ==7 && byte == 0){
                     secret[bytes_written] = byte;
+                    secret[bytes_written + 1] = '\0';
                     free(data_buffer);
-                    memcpy()
-                    return 0;
+                    memcpy(out, secret, bytes_written);
+                    printf("secret: %s\n", secret);
+                    return bytes_written;
                 }
                 else {
                     bits_written++;
                     byte <<= 1;
                 }
                 
-                
             }
         }
     }
-   
 
-    int count = 0;
-    if(ihdr.color_type == 3){
-        for(int i = 0; (i < encoding_capacity && count  < max_len); i+= iteration_amt ){
-            //go bit by bit through the byte and record results
-            uint8_t temp = 0x00;
-            for(int j = 0; j < 8; j++){
-                uint8_t byte = inflated_buffer[i * 8 + j];
-                if(byte > identical_colors[byte]){ // find the higher index
-                    temp |= 1;
-                }
-                temp <<= 1;
-            }
-            out[i] = temp;
-        }
-    } else {
-    //For non-palette images: modify the LSB of the first channel of each pixel
-        for(int i = 0; (i < encoding_capacity &  && count < max_len); i+= iteration_amt ){
-            //go bit by bit through the byte and record results
-            uint8_t temp = 0x00;
-            for(int j = 0; j < 8*iteration_amt; j+= iteration_amt){
-                uint8_t first_channel = inflated_buffer[i * 8 + j];
-                if(first_channel & 0xFE){ // LSB is 1
-                    temp |= 1;
-                }
-                temp <<=1;
-            }
-            out[i] = temp;
-        }
-    }
+    free(data_buffer);
+    memcpy(out, secret, bytes_written);
+    printf("secret: %s\n", secret);
+   
     free(inflated_buffer);
     fclose(inputp);
     return 0;

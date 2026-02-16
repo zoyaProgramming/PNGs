@@ -17,7 +17,7 @@ FILE *png_open(const char *path)
     if(path == NULL){
         return NULL;
     }
-    FILE * fp = fopen(path, "r"); 
+    FILE * fp = fopen(path, "rb"); 
     if(!fp){
         return NULL;
     }

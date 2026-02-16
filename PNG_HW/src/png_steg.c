@@ -113,7 +113,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         for (int i =0 ; (i < 256 && num_single > 0); i++){
             if(table[i] == -1){
                 palette[out_count] = palette[i];
-                table[i] = table[out_count];
+                table[i] = out_count;
                 table[out_count] = i;
                 out_count++;
                 num_single--;
@@ -270,7 +270,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         for(int i = 0; i < plte_offset_start; i++){
             fputc(fgetc(inputp), fp);
         };
-        
+
         write_PLTE(fp, palette, out_count);
         // copy the Plte
         fseek(inputp, plte_offset_end, SEEK_SET);
@@ -483,7 +483,6 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
                     secret[bytes_written + 1] = '\0';
                     free(data_buffer);
                     memcpy(out, secret, bytes_written);
-                    printf("secret: %s\n", secret);
                     return bytes_written;
                 }
                 else {

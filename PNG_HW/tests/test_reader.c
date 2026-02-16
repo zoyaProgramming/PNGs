@@ -104,9 +104,12 @@ Test(reader, png_extract_plte_null) {
 }
 
 Test(reader, png_summary) {
+    printf("\ntest1\n\n");
+    fflush(stdout);
     png_chunk_t *summary = NULL;
     int ret = png_summary("tests/data/Large_batman_6.png", &summary);
-    
+    printf("\ntest\n\n");
+    fflush(stdout);
     cr_assert_eq(ret, 0, "Should create summary");
     cr_assert_not_null(summary, "Summary should be allocated");
     
@@ -119,7 +122,6 @@ Test(reader, png_summary) {
         }
     }
     cr_assert(iend_found || summary[0].length == 0, "Should have IEND chunk or empty summary");
-    
     free(summary);
 }
 

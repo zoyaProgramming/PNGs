@@ -59,8 +59,8 @@ Test(steg_encode, encode_lsb_basic_type3) {
 
     /* Encode secret into PNG */
     int ret = png_encode_lsb(input, output, secret);
+    
     cr_assert_eq(ret, 0, "Encoding should succeed for color type 3");
-
     FILE *fp = fopen(output, "rb");
     cr_assert_not_null(fp, "Output file should be created");
     fclose(fp);

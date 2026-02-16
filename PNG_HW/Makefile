@@ -20,7 +20,7 @@ INC := -I $(INCD)
 
 CFLAGS := -fcommon -Wall -Werror -Wno-unused-function -MMD
 COLORF := -DCOLOR
-DFLAGS := -g -DDEBUG -DCOLOR
+DFLAGS := -g -DDEBUG -DCOLOR 
 PRINT_STAMENTS := -DERROR -DSUCCESS -DWARN -DINFO
 
 STD := -std=gnu11

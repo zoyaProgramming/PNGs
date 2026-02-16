@@ -68,7 +68,8 @@ Test(plte, parse_plte) {
     if (found_plte) {
         png_color_t *colors = NULL;
         size_t count = 0;
-        cr_assert_eq(png_parse_plte(&chunk, &colors, &count), 0, "Should parse PLTE");
+        int r_cod = png_parse_plte(&chunk, &colors, &count);
+        cr_assert_eq(r_cod, 0, "Should parse PLTE");
         cr_assert_not_null(colors, "Colors should be allocated");
         cr_assert_gt(count, 0, "Should have at least one color");
         cr_assert_leq(count, 256, "Should have at most 256 colors");
@@ -88,7 +89,7 @@ Test(plte, parse_plte_null) {
     cr_assert_eq(png_read_chunk(fp, &chunk), 0, "Failed to read chunk");
     
     cr_assert_neq(png_parse_plte(NULL, NULL, NULL), 0, "Should fail with NULL chunk");
-    
+    // breaks here
     png_color_t *colors = NULL;
     size_t count = 0;
     cr_assert_neq(png_parse_plte(&chunk, NULL, &count), 0, "Should fail with NULL colors");

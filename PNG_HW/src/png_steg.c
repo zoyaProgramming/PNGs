@@ -284,9 +284,11 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         };
     }
     
-    
+    printf("totalsize: %lu", total_size);
+    fflush(stdout);
         
     write_IDAT(fp, data_buffer, total_size);
+    
     
     // for(int i = 0; i < total_size; i++){
     //     if(fputc(data_buffer[i], fp) == EOF){

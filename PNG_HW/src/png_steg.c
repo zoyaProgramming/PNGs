@@ -256,7 +256,6 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         return -1;
     }
 
-
    //9) Write output PNG file, preserving all chunks except IDAT (replaced) and PLTE (if modified)
     FILE * fp = fopen(output_path, "wb");
     if(!fp){
@@ -266,11 +265,11 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 
     rewind(inputp);
     if(ihdr.color_type == 3 && plte_offset_start != -1){
+        
         // copy the pre: PLTE chunks
         for(int i = 0; i < plte_offset_start; i++){
             fputc(fgetc(inputp), fp);
         };
-
         write_PLTE(fp, palette, out_count);
         // copy the Plte
         fseek(inputp, plte_offset_end, SEEK_SET);
@@ -360,7 +359,8 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     int num_pairs = 0; 
     long ihdr_end = ftell(inputp);
     if(ihdr.color_type == 3){
-        png_extract_plte(inputp, &out_colors, &out_count);
+        png_extract_plte(inputp, &out_colors, &out_count); 
+        // for color in colors
         for(int i = 0; i < out_count; i++){
             Node * curr;
             palette[i] = out_colors[i];

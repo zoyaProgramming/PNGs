@@ -18,7 +18,7 @@ typedef struct {
 */
 
 
-void write_be_buf(char ** be_buf, uint32_t n);
+void write_be_buf(char (* be_buf)[], uint32_t n);
 int write_IDAT(FILE * fp, uint8_t * buf, uint32_t size);
 int write_PLTE(FILE * fp, png_color_t * buf, uint32_t size);
 #endif

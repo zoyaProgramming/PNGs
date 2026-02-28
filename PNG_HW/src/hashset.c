@@ -1,21 +1,35 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "png_chunks.h"
 #include "parse_options.h"
 #include "hashset.h"
 
 #define MAX_LEN 256
 
+void print_color(png_color_t  * color){
+    printf("r: %d, g: %d, b:%d\n", color->r, color->g, color->b);
+}
+ void print_option(Option * option) {
+    printf("optarg: %s, num_childs: %d, type: %c\n", option->optarg, option->num_childs, option->type);
+}
 int isequal(void * a, void * b, enum Type type){
     if(type == PNG_COLOR_T){
         png_color_t* colora =  (png_color_t *)a;
         png_color_t* colorb = (png_color_t *)b;
-        return (colora->r == colorb->b && colora->g == colorb->g && colora->b ==  colorb->b);
+        return ((colora->r == colorb->r) && (colora->g == colorb->g) && (colora->b == colorb->b));
     } else {
         Option * opta = (Option*)a;
         Option * optb = (Option*)b;
         return opta->type==optb->type;
+    }
+}
+void print_node(Node * node){
+    if(node->type == PNG_COLOR_T){
+        print_color((png_color_t*) node->contents);
+    } else {
+        print_option((Option * )node->contents);
     }
 }
 
@@ -46,7 +60,8 @@ Node * set_fetch(Hashset * set, png_color_t * data){
     Bucket b = set->buckets[data_hashed];
     Node * curr = b.head;
     while(curr){
-        if(isequal(&(curr->contents), data, set->type)){
+        if(isequal((curr->contents), data, set->type)){
+            fflush(stdout);
             return curr;
         }
         curr = curr->next;
@@ -59,7 +74,7 @@ int set_contains(Hashset * set, void * data){
     Bucket b = set->buckets[data_hashed];
     Node * curr = b.head;
     while(curr){
-        if(isequal(&(curr->contents), data, set->type)){
+        if(isequal((curr->contents), data, set->type)){
             return 1;
         }
         curr = curr->next;

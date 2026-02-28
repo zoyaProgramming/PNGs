@@ -1,0 +1,2 @@
+break src/hashset.c:33
+break src/png_steg.c:507

@@ -91,7 +91,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
     long ihdr_end = ftell(inputp);
     long plte_offset_start = -1;
     long plte_offset_end = -1;
-
+    //get the palette for palette types
     if(ihdr.color_type == 3){
         png_extract_plte(inputp, &out_colors, &out_count);
         for(int i = 0; i < out_count; i++){
@@ -108,6 +108,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
                 set_put(&unique_colors, out_colors + i, i);  // mark the node in the set
             }
         }
+
         // must write unique colors
         int num_single = out_count - 2*num_pairs;
         for (int i =0 ; (i < 256 && num_single > 0); i++){
@@ -182,7 +183,6 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
         fclose(inputp);
         return error_code;
     }
-    
     // 5) Calculate encoding capacity: width × height pixels
     uint32_t encoding_capacity = ihdr.width * ihdr.height;
     size_t secret_len = strlen(secret) + 1;
@@ -265,7 +265,6 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 
     rewind(inputp);
     if(ihdr.color_type == 3 && plte_offset_start != -1){
-        
         // copy the pre: PLTE chunks
         for(int i = 0; i < plte_offset_start; i++){
             fputc(fgetc(inputp), fp);
@@ -282,24 +281,7 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
             fputc(fgetc(inputp), fp);
         };
     }
-    
-    printf("totalsize: %lu", total_size);
-    fflush(stdout);
-        
     write_IDAT(fp, data_buffer, total_size);
-    
-    
-    // for(int i = 0; i < total_size; i++){
-    //     if(fputc(data_buffer[i], fp) == EOF){
-    //         fflush(stdout);
-    //         fclose(inputp);
-    //         fclose(fp);
-    //         free(data_buffer);
-    //         return -1;
-    //     }
-    // };
-    // skip crc
-
     fseek(inputp, idat_end, SEEK_SET);
     int c;
     while((c = fgetc(inputp) ) != EOF){
@@ -321,17 +303,18 @@ int unfilter_bytes(uint8_t * filtered, int color_type, size_t height, size_t wid
 /* Extract secret string from LSBs of image data */
 int png_extract_lsb(const char *input_path, char *out, size_t max_len)
 {
-    // 1) open and validate:
-    FILE * inputp = png_open(input_path);
-    if(!inputp || max_len == 0 || out == NULL){
-        fclose(inputp);
+    // 1) check for NULL parameters b4 opening
+    if(!input_path || !max_len || !out){
         return -1;
     }
+    FILE * input_fp = png_open(input_path); // open file
+    if(!input_fp) return -1;
+    
     // 2) read & parse IHDR chunk to determine properties 
     png_ihdr_t ihdr;
-    png_extract_ihdr(inputp, &ihdr);
+    png_extract_ihdr(input_fp, &ihdr);
     if(ihdr.bit_depth != 8){
-        fclose(inputp);
+        fclose(input_fp);
         return -1;
     }
 
@@ -344,7 +327,7 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
         case 4: num_channels = 2; break;
         case 6: num_channels = 4; break;
         default:
-            fclose(inputp);
+            fclose(input_fp);
             return -1;
     }
 
@@ -352,21 +335,23 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     png_color_t * out_colors = NULL;
     size_t out_count;
     png_color_t palette[256];
-    
     int identical_colors[256];
+    memset(identical_colors, -1, sizeof(identical_colors));
     // use a hashset for unique colors
-    Hashset unique_colors; 
+    Hashset unique_colors = {0}; 
+    unique_colors.type = 0;
+
     int num_pairs = 0; 
-    long ihdr_end = ftell(inputp);
+    long ihdr_end = ftell(input_fp);
     if(ihdr.color_type == 3){
-        png_extract_plte(inputp, &out_colors, &out_count); 
+        png_extract_plte(input_fp, &out_colors, &out_count);
         // for color in colors
         for(int i = 0; i < out_count; i++){
             Node * curr;
             palette[i] = out_colors[i];
             if((curr = set_fetch(&unique_colors, &out_colors[i]))){ // there is a duplicate of plte[i] in the hashset, can record this
                 num_pairs++;
-                if(curr->index < 128){
+                if(1 || curr->index < 128){
                     identical_colors[curr->index] = i; // write down the pair
                     identical_colors[i] = curr->index;
                 }
@@ -375,17 +360,17 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
                 set_put(&unique_colors, out_colors + i, i);  // mark the node in the set
             }
         }
+        
     };
     // 4) decompress IDAT chunks
     png_chunk_t chunk;
     int error_code = 0;
     long idat_start = -1;
-
     // go to the first IDAT chunk
-    fseek(inputp, ihdr_end, SEEK_SET);
-    while(!(error_code = png_read_chunk(inputp, &chunk))){
+    fseek(input_fp, ihdr_end, SEEK_SET);
+    while(!(error_code = png_read_chunk(input_fp, &chunk))){
         if(strncmp(chunk.type, "IDAT", 4) == 0){
-            idat_start = ftell(inputp) - (12 + chunk.length);
+            idat_start = ftell(input_fp) - (12 + chunk.length);
             break;
         } else if(strncmp(chunk.type, "PLTE", 4) == 0){
             png_free_chunk(&chunk);
@@ -394,7 +379,7 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
         }
     };
     if(idat_start == -1 || error_code){
-        fclose(inputp); png_free_chunk(&chunk); 
+        fclose(input_fp); png_free_chunk(&chunk); 
         return -1;
     }
     // load all IDAT chunks into buffer
@@ -407,18 +392,18 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
         if(!new_ptr){
             png_free_chunk(&chunk);
             free(data_buffer);
-            fclose(inputp);
+            fclose(input_fp);
             return -1;
         }
         data_buffer = new_ptr;
         memcpy(data_buffer + total_size, chunk.data, chunk.length);
         total_size += chunk.length;
         png_free_chunk(&chunk);
-        idat_end = ftell(inputp);
-        error_code = png_read_chunk(inputp, &chunk);
+        idat_end = ftell(input_fp);
+        error_code = png_read_chunk(input_fp, &chunk);
     }
     if(error_code || idat_end == -1) {
-        fclose(inputp);
+        fclose(input_fp);
         return -1;
     }
 
@@ -428,8 +413,7 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     error_code = util_inflate_data(data_buffer, total_size, &inflated_buffer, &inflated_size);
     if(error_code){
         free(data_buffer);
-        fflush(stdout);
-        fclose(inputp);
+        fclose(input_fp);
         return error_code;
     }
     
@@ -442,64 +426,69 @@ int png_extract_lsb(const char *input_path, char *out, size_t max_len)
     int bits_written = 0;
     char secret[max_len];
     if(ihdr.color_type == 3){
-        int byte = 0;
+        uint8_t byte = 0;
+        uint8_t mask = 1U;
         for(int scanline = 0; (scanline < ihdr.height*bytes_per_row) && (bytes_written < max_len); scanline+= bytes_per_row){
             for(int pixel = 1; (pixel < bytes_per_row && bytes_written < max_len); pixel+=bytes_per_pixel){
-                uint8_t palette_index = inflated_buffer[scanline + pixel];
-                uint8_t pair = identical_colors[palette_index];
-                if(palette_index > pair){ // larger index in the palette
-                    byte |= 1;
+                int palette_index = inflated_buffer[scanline + pixel];
+                int pair = identical_colors[palette_index];
+                if(pair != -1){
+                    if(palette_index > pair){ // larger index in the palette
+                        byte |= mask; // set to 1
+                    }
+                    // check if need to start reading next byte
+                    if(bits_written%8 == 7 && byte != 0){
+                        secret[bytes_written] = byte;
+                        bytes_written++;
+                        byte = 0;
+                        bits_written++;
+                        mask = 1U;
+                    }else if(bits_written%8 ==7 && byte == 0){
+                        secret[bytes_written] = byte;
+                        free(data_buffer);
+                        memcpy(out, secret, bytes_written);
+                        return bytes_written;
+                    } else {
+                        bits_written++;
+                        mask <<= 1;
+                    }
                 }
-                byte <<=1;
-                // check if need to start reading next byte
-                if(bits_written%8 == 7){
-                    bytes_written++;
-                    byte = 0;
-                    bits_written = 0;
-                } else {
-                    bits_written++;
-                    byte <<= 1;
-                }
-
             }
         }
     } else {
     //For non-palette images: check the LSB of the first channel of each pixel
-        unsigned char byte = 0x0;
+        uint8_t byte = 0x0;
+        uint8_t mask = 1U;
         for(int scanline = 0; (scanline < ihdr.height*bytes_per_row) && (bytes_written < max_len); scanline+= bytes_per_row){
             //go bit by bit through the byte and record results
             for(int pixel = 1; (pixel < bytes_per_row) && (bytes_written < max_len); pixel += bytes_per_pixel){
-                if((inflated_buffer[scanline + pixel]) & 0xFE){ // find the higher index
-                    byte |= 1;
+                if((inflated_buffer[scanline + pixel]) & (uint8_t)(1)){ // find the higher index
+                    byte |= mask;
                 }
                 // check if need to start writing to the next byte of secret
                 if((bits_written%8 == 7) && (byte != 0)){
                     secret[bytes_written] = byte;
-                    bytes_written++;
+                    bytes_written++; bits_written++;
                     byte = 0;
-                    bits_written = 0;
-                }  else if(bits_written%8 ==7 && byte == 0){
+                    mask = 1U;
+                } else if(bits_written%8 ==7 && byte == 0){
                     secret[bytes_written] = byte;
                     secret[bytes_written + 1] = '\0';
                     free(data_buffer);
                     memcpy(out, secret, bytes_written);
                     return bytes_written;
-                }
-                else {
+                }   else {
                     bits_written++;
-                    byte <<= 1;
+                    mask <<= 1;
                 }
-                
             }
         }
     }
 
     free(data_buffer);
     memcpy(out, secret, bytes_written);
-    printf("secret: %s\n", secret);
-   
     free(inflated_buffer);
-    fclose(inputp);
+    fclose(input_fp);
     return 0;
 }
 

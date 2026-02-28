@@ -8,7 +8,7 @@
 
 #define MAX_LEN 256
 
-enum Type{PNG_COLOR_T, OPTION};
+enum Type {PNG_COLOR_T, OPTION};
 typedef struct Node{
     struct Node * next;
     struct Node * prev;

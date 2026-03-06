@@ -102,9 +102,9 @@ int set_put(Hashset * set, void * data, int index){
         set->buckets[data_hashed].n += 1;
         set->buckets[data_hashed].tail = temp;
         set->length ++;
-
+        return 0;
     }
-    return 0;
+    return -1;
 }
 
 int remove_node(Hashset * hash, void * data){

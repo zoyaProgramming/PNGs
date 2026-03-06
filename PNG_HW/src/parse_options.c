@@ -192,25 +192,30 @@ int parse_next_opt( int* argc, char *** argv, Option ** out){
 
 }
 int parse_opts(int argc, char **argv, Option ** out, int * out_len){
+    printf("disfj\n");
+    fflush(stdout);
     Option * arr = malloc(sizeof(Option) * MAX_SIZE);
-    int error_code;
+   int error_code;
     Option * latest_option;
     Hashset options;
     options.type  = OPTION;
     int n = 0;
     // scan all options
+
+
     while(!(error_code = parse_next_opt( &argc, &argv, &latest_option)) ) {
+        printf("disfj\n");
+        fflush(stdout);
         if(!set_contains(&options, &(latest_option->type))){
             set_put(&options, &(latest_option->type), n);
             arr[n++] = *latest_option;
         }
     }; 
-    if(error_code){
-        free_opt_array(n, &arr);
-        free_set(&options);
-        return error_code; 
-    }
-    *out = arr;
-    *out_len = n;
+
+    printf("sfj %d\n",n);
+    fflush(stdout);
+    free_opt_array(n, &arr);
+    free_set(&options);
+    
     return 0;
 }

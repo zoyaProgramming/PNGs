@@ -295,9 +295,6 @@ int png_encode_lsb(const char *input_path, const char *output_path, const char *
 
 
 
-int unfilter_bytes(uint8_t * filtered, int color_type, size_t height, size_t width){
-    return 0;
-}
 
 
 /* Extract secret string from LSBs of image data */

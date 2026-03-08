@@ -174,7 +174,7 @@ int main(int argc, char **argv)
                 PRINT_PALETTE_HEADER(filename);
                 PRINT_PALETTE_COUNT(out_count);
                 for(int i = 0 ; i < out_count; i++){
-                    PRINT_PALETTE_COLOR(i, out_colors[i].r, out_colors[i].g, out_colors[i].b);
+                    PRINT_PALETTE_COLOR((size_t) i, out_colors[i].r, out_colors[i].g, out_colors[i].b);
                 }
                 free(out_colors);
                 break;

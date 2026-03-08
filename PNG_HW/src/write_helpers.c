@@ -41,6 +41,64 @@ int write_IDAT(FILE * fp, uint8_t * buf, uint32_t size){
 }
 
 
+int buf_write_IDAT(uint8_t * out_buf, uint8_t * buf, uint32_t size){
+     if(buf == NULL){
+        return -1;
+    }
+    //write the size to the IDAT chunk
+    char be_buf[4] = {0};
+    
+    write_be_buf(&be_buf, size);
+    memcpy(out_buf, be_buf, 4);// write big endian to buf
+
+    memcpy(out_buf, "IDAT", 4);// write big endian to buf
+     memcpy(out_buf, buf, size ); // coppy data from buf
+    
+    
+    // calculate crc
+    uint8_t temp_data_storage[size + 5];
+    memcpy(temp_data_storage, "IDAT", 4);
+    memcpy(temp_data_storage + 4, buf, size);
+    temp_data_storage[size + 4] = 0;
+ 
+    uint32_t calculated_crc = png_crc(temp_data_storage, (size_t)(size + 4));
+
+    write_be_buf(&be_buf, calculated_crc);
+    memcpy(out_buf, be_buf, 4);// write big endian to buf
+    return 0;
+}
+
+
+    
+int buf_write_PLTE(uint8_t * out_buf, png_color_t * buf, uint32_t size){
+    if(buf == NULL || out_buf == NULL){
+        return -1;
+    }
+    //write the size to the PLTE chunk
+    char be_buf[4] = {0};
+    write_be_buf(&be_buf, size*sizeof(png_color_t)); // store be string in be_buf
+
+    memcpy(out_buf, be_buf, 4);// write big endian length to buf
+
+    
+    memcpy(out_buf + 4, "PLTE", 4); // write "PLTE" to buf
+    memcpy(out_buf + 8, buf, size * sizeof(png_color_t)); // write all color data to buffer
+    
+    // calculate crc
+    uint8_t temp_data_storage[size*sizeof(png_color_t) + 5];
+    memcpy(temp_data_storage, "PLTE", 4);
+    memcpy(temp_data_storage + 4, buf, size*sizeof(png_color_t));
+    temp_data_storage[size*sizeof(png_color_t) + 4] = 0;
+ 
+    
+    uint32_t calculated_crc = png_crc(temp_data_storage, size*sizeof(png_color_t) + 4);
+
+    write_be_buf(&be_buf, calculated_crc);
+    memcpy(out_buf + 8 + size * sizeof(png_color_t), be_buf, 4);
+    
+    return 0;
+}
+
 int write_PLTE(FILE * fp, png_color_t * buf, uint32_t size){
     if(buf == NULL){
         return -1;
